@@ -1,49 +1,61 @@
 import { Injectable } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
 import Swal from 'sweetalert2';
+import { interval } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class BuildUpdateService {
-
   constructor(private swUpdate: SwUpdate) {
-    this.listenForUpdates();
+    this.startPeriodicUpdateChecks();
   }
 
-  private listenForUpdates() {
-    if (this.swUpdate.isEnabled) {
-      // this.swUpdate.versionUpdates.subscribe(event => {
-      //   if (event.type === 'VERSION_READY') {
-      //     this.notifyUser();
-      //   }
-      // });
-      setInterval(() => {
-        this.swUpdate.checkForUpdate().then(isUpdateAvailable => {
-          if (isUpdateAvailable) {
-            this.notifyUser();
-          }
-        })
-      }, 60000)
+  startPeriodicUpdateChecks() {
+    // Ensure service worker updates are enabled
+    if (!this.swUpdate.isEnabled) {
+      console.log('Service Worker Updates not enabled');
+      return;
     }
+
+    // Check for updates every 1 minute (60000 milliseconds)
+    interval(60000).subscribe(() => {
+      this.checkForUpdate();
+    });
   }
 
-  private notifyUser() {
-    Swal.fire({
-      title: 'Update Available',
-      text: 'A new version is available',
-      icon: 'warning',
-      confirmButtonText: 'Update',
-      allowOutsideClick: false
-    }).then((result) => {
-      if (result.value) {
-        this.refreshApp();
-      }
-    })
-  }
-
-  private refreshApp() {
-    window.location.reload();
+  private checkForUpdate() {
+    this.swUpdate.checkForUpdate().then(() => {
+      // Listen for available updates
+      this.swUpdate.versionUpdates.subscribe(event => {
+        // Show SweetAlert as soon as an update is detected
+        if(event.type == "VERSION_DETECTED") {
+          console.log("New version detected and starting to install");
+        }
+        else if(event.type == "VERSION_INSTALLATION_FAILED") {
+          console.error('Failed to install the update');
+          console.error(event.error);
+        }
+        else if(event.type == "VERSION_READY") {
+          console.log(`running version: ${event.currentVersion.hash}`);
+          console.log(`available version: ${event.latestVersion.hash}`);
+          Swal.fire({
+            title: 'New Version Available',
+            text: 'A new version of the application has been deployed.',
+            icon: 'info',
+            confirmButtonText: 'Update',
+          }).then((result) => {
+            if (result.isConfirmed) {
+              // Activate the new version and reload
+              this.swUpdate.activateUpdate().then(() => {
+                document.location.reload();
+              });
+            }
+          });
+        }
+      });
+    }).catch(err => {
+      console.error('Failed to check for updates', err);
+    });
   }
 }
-

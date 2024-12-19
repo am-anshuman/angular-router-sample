@@ -22,7 +22,7 @@ import { ServiceWorkerModule } from '@angular/service-worker';
       {path: 'heroes-list', component: HeroesListComponent},
       {path: '', redirectTo: 'heroes-list', pathMatch: 'full'},
       {path: '**', component: PageNotFoundComponent}
-    ]),
+    ], {useHash: true}),
     ServiceWorkerModule.register('ngsw-worker.js', {
       enabled: !isDevMode(),
       // Register the ServiceWorker as soon as the application is stable
